@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -12,6 +12,7 @@ const grupos = useGruposStore()
 const distribucion = useDistribucionStore()
 const menuOpen = ref(false)
 const busqueda = ref('')
+watch(() => route.fullPath, () => { menuOpen.value = false })
 const links = [
   { to: '/', label: 'Dashboard', icon: 'grid' },
   { to: '/grupos', label: 'Grupos', icon: 'users' },
@@ -31,9 +32,9 @@ async function salir() {
 }
 </script>
 <template>
-  <div class="app-layout">
+  <div class="app-layout" @keydown.esc="menuOpen=false">
     <div v-if="menuOpen" class="mobile-overlay" @click="menuOpen=false"></div>
-    <aside class="sidebar" :class="{ 'open':menuOpen }">
+    <aside id="menu-principal" class="sidebar" :class="{ 'open':menuOpen }">
       <RouterLink to="/" class="brand" @click="menuOpen=false">
         <span class="brand-mark"><AppIcon name="ticket" :size="25" /></span>
         <span>Control de<br /><strong>Bingo</strong></span>
@@ -51,7 +52,7 @@ async function salir() {
     </aside>
     <div class="workspace">
       <header class="topbar">
-        <button class="icon-button menu-toggle" aria-label="Abrir menú" @click="menuOpen=!menuOpen"><AppIcon name="menu"/></button>
+        <button class="icon-button menu-toggle" aria-controls="menu-principal" :aria-expanded="menuOpen" :aria-label="menuOpen ? 'Cerrar menú' : 'Abrir menú'" @click="menuOpen=!menuOpen"><AppIcon name="menu"/></button>
         <form class="global-search" role="search" @submit.prevent="buscar"><AppIcon name="search" :size="19"/><input v-model="busqueda" aria-label="Buscar número" inputmode="numeric" placeholder="Buscar cartón... (ej. 00123)"/><button type="submit" aria-label="Buscar"><AppIcon name="arrow" :size="16"/></button></form>
         <div class="topbar-actions"><span class="mode-pill">DEMO</span><div class="user-avatar">{{ nombreUsuario.slice(0,1).toUpperCase() }}</div><div class="user-label"><strong>{{ nombreUsuario }}</strong><small>{{ auth.configurado ? 'Conectado' : 'Modo local' }}</small></div></div>
       </header>
