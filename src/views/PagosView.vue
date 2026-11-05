@@ -5,15 +5,30 @@ import { usePagosStore } from '@/stores/pagos'
 import { useDistribucionStore } from '@/stores/distribucion'
 import { useGruposStore } from '@/stores/grupos'
 import { supabaseConfigurado } from '@/infrastructure/supabase/supabaseClient'
-import { crearInventario, MEDIOS_PAGO } from '@/domain/pagos/pago'
+import { crearInventario, numerosDelRango, MEDIOS_PAGO } from '@/domain/pagos/pago'
 
 const pagos = usePagosStore(), distribucion = useDistribucionStore(), grupos = useGruposStore()
 const numero = ref(''), medio = ref('Efectivo'), busqueda = ref(''), estado = ref('')
+const hasta = ref('')
 const error = ref(''), mensaje = ref(''), cargando = ref(false), guardando = ref(false)
 const responsable = ref(''), editando = ref(null)
 const pagina = ref(1), porPagina = 50
 const inventario = computed(() => crearInventario(pagos.pagos, distribucion.asignaciones, grupos.grupos))
 const seleccionada = computed(() => inventario.value.find(c => c.numero === Number(numero.value)))
+const rango = computed(() => {
+  try { return numerosDelRango(numero.value, hasta.value) } catch { return [] }
+})
+const errorRango = computed(() => {
+  if (!numero.value || !hasta.value) return ''
+  try { numerosDelRango(numero.value, hasta.value); return '' } catch (e) { return e.message }
+})
+const pagadasEnRango = computed(() => {
+  const numeros = new Set(rango.value)
+  return pagos.pagos.filter(p => numeros.has(p.numero)).length
+})
+const puedeGuardar = computed(() => editando.value !== null
+  ? seleccionada.value && (!seleccionada.value.pago || seleccionada.value.numero === editando.value)
+  : rango.value.length > 0 && pagadasEnRango.value === 0)
 const visibles = computed(() => inventario.value.filter(c =>
   (!estado.value || c.estado === estado.value) &&
   (!busqueda.value.trim() || c.codigo.includes(busqueda.value.trim()) ||
@@ -41,8 +56,13 @@ async function registrar() {
   try {
     const datos = { numero: numero.value, medio: medio.value, responsable: responsable.value }
     const esEdicion = editando.value !== null
-    const pago = esEdicion ? await pagos.editar(editando.value, datos) : await pagos.registrar(datos)
-    mensaje.value = 'Cartilla #' + String(pago.numero).padStart(5, '0') + (esEdicion ? ': pago corregido.' : ' marcada como Pagada.')
+    if (esEdicion) {
+      const pago = await pagos.editar(editando.value, datos)
+      mensaje.value = 'Cartilla #' + String(pago.numero).padStart(5, '0') + ': pago corregido.'
+    } else {
+      const lote = await pagos.registrarRango({ desde: numero.value, hasta: hasta.value, medio: medio.value, responsable: responsable.value })
+      mensaje.value = lote.length + ' cartillas marcadas como pagadas: de #' + String(lote[0].numero).padStart(5, '0') + ' a #' + String(lote[lote.length - 1].numero).padStart(5, '0') + '.'
+    }
     cancelarEdicion()
   } catch (e) { error.value = e.message }
   finally { guardando.value = false }
@@ -50,6 +70,7 @@ async function registrar() {
 function cancelarEdicion() {
   editando.value = null
   numero.value = ''
+  hasta.value = ''
   responsable.value = ''
   medio.value = 'Efectivo'
 }
@@ -75,6 +96,7 @@ async function devolverPendiente(cartilla) {
 function seleccionar(cartilla) {
   cancelarEdicion()
   numero.value = cartilla.codigo
+  hasta.value = cartilla.codigo
   mensaje.value = ''
   document.getElementById('numero-pago')?.focus()
 }
@@ -83,7 +105,7 @@ onMounted(cargar)
 
 <template>
   <div class="page-header">
-    <div><h1>Control de pagos</h1><p>Consulta y registra el pago de cada cartilla.</p></div>
+    <div><h1>Control de pagos</h1><p>Registra pagos por rango de cartillas y consulta su estado.</p></div>
     <button class="outline-btn" :disabled="cargando || guardando" @click="cargar">Actualizar</button>
   </div>
   <div v-if="!supabaseConfigurado" class="notice">
@@ -98,20 +120,29 @@ onMounted(cargar)
     <div class="surface metric-card"><div class="metric-icon amber"><AppIcon name="clock" /></div><div><div class="metric-title">Pendientes</div><div class="metric-value">{{ pagos.listo ? 3000 - pagos.pagos.length : '—' }}</div></div></div>
   </div>
   <section class="surface surface-pad">
-    <div class="surface-heading"><h2>{{ editando !== null ? 'Editar pago de #' + String(editando).padStart(5, '0') : 'Registrar pago' }}</h2></div>
+    <div class="surface-heading"><h2>{{ editando !== null ? 'Editar pago de #' + String(editando).padStart(5, '0') : 'Registrar pago por rango' }}</h2></div>
     <form @submit.prevent="registrar">
       <div class="form-row">
-        <div class="field"><label for="numero-pago">Número de cartilla</label><input id="numero-pago" v-model="numero" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00123" :disabled="bloqueado" /></div>
+        <div class="field"><label for="numero-pago">{{ editando !== null ? 'Número de cartilla' : 'Desde la cartilla n.°' }}</label><input id="numero-pago" v-model="numero" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00010" :disabled="bloqueado" /></div>
+        <div v-if="editando === null" class="field"><label for="hasta-pago">Hasta la cartilla n.°</label><input id="hasta-pago" v-model="hasta" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00025" :disabled="bloqueado" /></div>
+      </div>
+      <div class="form-row">
         <div class="field"><label for="medio-pago">Medio de pago</label><select id="medio-pago" v-model="medio" :disabled="bloqueado"><option v-for="opcion in MEDIOS_PAGO" :key="opcion">{{ opcion }}</option></select></div>
       </div>
       <div class="field"><label for="responsable-pago">Responsable del pago *</label><input id="responsable-pago" v-model="responsable" required maxlength="120" placeholder="Nombre y apellido de la persona responsable" :disabled="bloqueado" /></div>
       <p v-if="editando !== null" class="helper">Puedes corregir la cartilla, el medio y el responsable. Si cambias el número, la cartilla anterior quedará pendiente.</p>
-      <p v-if="seleccionada && pagos.listo" class="helper">
+      <template v-if="editando === null">
+        <p class="helper">Ambos números están incluidos. El responsable y el medio de pago se aplican a todo el rango. Para una sola cartilla, repite el número en ambos campos.</p>
+        <p v-if="errorRango" class="notice error" role="alert">{{ errorRango }}</p>
+        <p v-if="rango.length && pagos.listo" class="helper" role="status">{{ rango.length }} cartillas seleccionadas · {{ rango.length - pagadasEnRango }} pendientes · {{ pagadasEnRango }} pagadas.</p>
+        <p v-if="pagadasEnRango && pagos.listo" class="notice error" role="alert">El rango contiene cartillas pagadas. Ajusta los números para registrar únicamente cartillas pendientes.</p>
+      </template>
+      <p v-if="editando !== null && seleccionada && pagos.listo" class="helper">
         #{{ seleccionada.codigo }} · {{ seleccionada.grupo }} ·
         <span class="status" :class="seleccionada.pago ? 'green' : 'amber'">{{ seleccionada.estado }}</span>
       </p>
-      <button class="primary-btn" type="submit" :disabled="bloqueado || !seleccionada || !responsable.trim() || (!!seleccionada.pago && seleccionada.numero !== editando)">
-        {{ guardando ? 'Guardando…' : editando !== null ? 'Guardar cambios' : seleccionada?.pago ? 'Esta cartilla ya está pagada' : 'Marcar como pagada' }}
+      <button class="primary-btn" type="submit" :disabled="bloqueado || !puedeGuardar || !responsable.trim()">
+        {{ guardando ? 'Guardando…' : editando !== null ? 'Guardar cambios' : 'Registrar pago del rango' }}
       </button>
       <button v-if="editando !== null" class="outline-btn" type="button" :disabled="guardando" @click="cancelarEdicion">Cancelar edición</button>
       <p class="helper payment-help">Registra el pago después de confirmar que lo recibiste.</p>

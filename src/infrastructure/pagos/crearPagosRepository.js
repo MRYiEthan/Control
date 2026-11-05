@@ -11,6 +11,25 @@ export function crearPagosRepository({ cliente = null, storage }) {
     return datos
   }
   return {
+    async crearLote(lote) {
+      if (!lote.length) throw new Error('El rango está vacío')
+      if (new Set(lote.map(p => p.numero)).size !== lote.length) throw new Error('El rango contiene cartillas duplicadas')
+      if (!cliente) {
+        const pagos = leer()
+        const ocupadas = new Set(pagos.map(p => p.numero))
+        if (lote.some(p => ocupadas.has(p.numero))) throw new Error('Una cartilla del rango ya está pagada. No se registró el rango.')
+        storage.setItem(KEY, JSON.stringify([...pagos, ...lote]))
+        return lote
+      }
+      // Una única inserción evita pagos parciales. Sin select para no truncar rangos grandes.
+      const { error } = await cliente.from('pagos_cartillas').insert(
+        lote.map(({ numero, medio, responsable }) => ({ numero, medio, responsable })),
+      )
+      if (error) throw new Error(error.code === '23505'
+        ? 'Una cartilla del rango ya está pagada. Actualiza el inventario. No se registró el rango.'
+        : 'No se pudo registrar el rango. ' + error.message)
+      return lote
+    },
     async listar() {
       if (!cliente) return leer()
       const pagos = []

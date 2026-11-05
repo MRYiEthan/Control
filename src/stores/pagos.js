@@ -40,6 +40,15 @@ export const usePagosStore = defineStore('pagos', () => {
     }
     return pago
   }
+  async function registrarRango(datos) {
+    const actual = version
+    const lote = await gestor.registrarRango(datos)
+    if (actual === version) {
+      const numeros = new Set(lote.map(p => p.numero))
+      pagos.value = [...pagos.value.filter(p => !numeros.has(p.numero)), ...lote]
+    }
+    return lote
+  }
   async function editar(numeroOriginal, datos) {
     const actual = version
     const pago = await gestor.editar(numeroOriginal, datos)
@@ -53,5 +62,5 @@ export const usePagosStore = defineStore('pagos', () => {
     await gestor.devolverPendiente(numero)
     if (actual === version) pagos.value = pagos.value.filter(p => p.numero !== numero)
   }
-  return { pagos, listo, cargar, registrar, editar, devolverPendiente, limpiar }
+  return { pagos, listo, cargar, registrar, registrarRango, editar, devolverPendiente, limpiar }
 })

@@ -2,6 +2,25 @@ import { crearNumeroCarton } from '../cartones/numeroCarton.js'
 
 export const MEDIOS_PAGO = ['Efectivo', 'Yape', 'Plin', 'Transferencia']
 
+export function numerosDelRango(desde, hasta) {
+  const extremos = [desde, hasta].map(valor => {
+    const texto = String(valor ?? '').trim()
+    if (!/^[0-9]{1,5}$/.test(texto)) throw new Error('Completa Desde y Hasta con números entre 00001 y 03000')
+    return Number(crearNumeroCarton(texto))
+  })
+  if (extremos[0] > extremos[1]) throw new Error('Desde no puede ser mayor que Hasta')
+  return Array.from({ length: extremos[1] - extremos[0] + 1 }, (_, i) => extremos[0] + i)
+}
+
+export function crearPagosRango({ desde, hasta, medio, responsable }, existentes = []) {
+  const numeros = numerosDelRango(desde, hasta)
+  const ocupadas = new Set(existentes.map(p => p.numero))
+  const duplicada = numeros.find(numero => ocupadas.has(numero))
+  if (duplicada !== undefined) throw new Error('La cartilla #' + String(duplicada).padStart(5, '0') + ' ya está pagada. No se registró el rango.')
+  const fecha = new Date().toISOString()
+  return numeros.map(numero => ({ ...crearPago({ numero, medio, responsable }), created_at: fecha }))
+}
+
 export function crearPago({ numero, medio, responsable }, existentes = []) {
   const texto = String(numero ?? '').trim()
   if (!/^[0-9]{1,5}$/.test(texto)) throw new Error('Introduce un número entre 00001 y 03000')
