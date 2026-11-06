@@ -10,8 +10,10 @@ import { crearInventario, numerosDelRango, MEDIOS_PAGO } from '@/domain/pagos/pa
 const pagos = usePagosStore(), distribucion = useDistribucionStore(), grupos = useGruposStore()
 const numero = ref(''), medio = ref('Efectivo'), busqueda = ref(''), estado = ref('')
 const hasta = ref('')
+const tipoPago = ref('unidad')
 const error = ref(''), mensaje = ref(''), cargando = ref(false), guardando = ref(false)
 const responsable = ref(''), editando = ref(null)
+const esBloque = computed(() => editando.value === null && tipoPago.value === 'bloque')
 const pagina = ref(1), porPagina = 50
 const inventario = computed(() => crearInventario(pagos.pagos, distribucion.asignaciones, grupos.grupos))
 const seleccionada = computed(() => inventario.value.find(c => c.numero === Number(numero.value)))
@@ -26,7 +28,7 @@ const pagadasEnRango = computed(() => {
   const numeros = new Set(rango.value)
   return pagos.pagos.filter(p => numeros.has(p.numero)).length
 })
-const puedeGuardar = computed(() => editando.value !== null
+const puedeGuardar = computed(() => !esBloque.value
   ? seleccionada.value && (!seleccionada.value.pago || seleccionada.value.numero === editando.value)
   : rango.value.length > 0 && pagadasEnRango.value === 0)
 const visibles = computed(() => inventario.value.filter(c =>
@@ -40,6 +42,7 @@ const filas = computed(() => visibles.value.slice((pagina.value - 1) * porPagina
 const bloqueado = computed(() => cargando.value || guardando.value || !pagos.listo)
 watch([busqueda, estado], () => { pagina.value = 1 })
 watch(paginas, total => { pagina.value = Math.min(pagina.value, total) })
+watch(tipoPago, () => { hasta.value = ''; error.value = ''; mensaje.value = '' })
 const fecha = value => value ? new Date(value).toLocaleString('es-PE') : '—'
 
 async function cargar() {
@@ -59,6 +62,9 @@ async function registrar() {
     if (esEdicion) {
       const pago = await pagos.editar(editando.value, datos)
       mensaje.value = 'Cartilla #' + String(pago.numero).padStart(5, '0') + ': pago corregido.'
+    } else if (!esBloque.value) {
+      const pago = await pagos.registrar(datos)
+      mensaje.value = 'Cartilla #' + String(pago.numero).padStart(5, '0') + ' marcada como pagada.'
     } else {
       const lote = await pagos.registrarRango({ desde: numero.value, hasta: hasta.value, medio: medio.value, responsable: responsable.value })
       mensaje.value = lote.length + ' cartillas marcadas como pagadas: de #' + String(lote[0].numero).padStart(5, '0') + ' a #' + String(lote[lote.length - 1].numero).padStart(5, '0') + '.'
@@ -95,8 +101,8 @@ async function devolverPendiente(cartilla) {
 }
 function seleccionar(cartilla) {
   cancelarEdicion()
+  tipoPago.value = 'unidad'
   numero.value = cartilla.codigo
-  hasta.value = cartilla.codigo
   mensaje.value = ''
   document.getElementById('numero-pago')?.focus()
 }
@@ -105,7 +111,7 @@ onMounted(cargar)
 
 <template>
   <div class="page-header">
-    <div><h1>Control de pagos</h1><p>Registra pagos por rango de cartillas y consulta su estado.</p></div>
+    <div><h1>Control de pagos</h1><p>Registra pagos por unidad para ventas en la parroquia o en bloque para grupos.</p></div>
     <button class="outline-btn" :disabled="cargando || guardando" @click="cargar">Actualizar</button>
   </div>
   <div v-if="!supabaseConfigurado" class="notice">
@@ -120,29 +126,36 @@ onMounted(cargar)
     <div class="surface metric-card"><div class="metric-icon amber"><AppIcon name="clock" /></div><div><div class="metric-title">Pendientes</div><div class="metric-value">{{ pagos.listo ? 3000 - pagos.pagos.length : '—' }}</div></div></div>
   </div>
   <section class="surface surface-pad">
-    <div class="surface-heading"><h2>{{ editando !== null ? 'Editar pago de #' + String(editando).padStart(5, '0') : 'Registrar pago por rango' }}</h2></div>
+    <div class="surface-heading"><h2>{{ editando !== null ? 'Editar pago de #' + String(editando).padStart(5, '0') : 'Registrar pago' }}</h2></div>
     <form @submit.prevent="registrar">
+      <div v-if="editando === null" class="field">
+        <label for="tipo-pago">Tipo de pago</label>
+        <select id="tipo-pago" v-model="tipoPago" :disabled="bloqueado">
+          <option value="unidad">Por unidad — venta en la parroquia</option>
+          <option value="bloque">En bloque — pago de grupos</option>
+        </select>
+      </div>
       <div class="form-row">
-        <div class="field"><label for="numero-pago">{{ editando !== null ? 'Número de cartilla' : 'Desde la cartilla n.°' }}</label><input id="numero-pago" v-model="numero" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00010" :disabled="bloqueado" /></div>
-        <div v-if="editando === null" class="field"><label for="hasta-pago">Hasta la cartilla n.°</label><input id="hasta-pago" v-model="hasta" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00025" :disabled="bloqueado" /></div>
+        <div class="field"><label for="numero-pago">{{ esBloque ? 'Desde la cartilla n.°' : 'Número de cartilla' }}</label><input id="numero-pago" v-model="numero" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00010" :disabled="bloqueado" /></div>
+        <div v-if="esBloque" class="field"><label for="hasta-pago">Hasta la cartilla n.°</label><input id="hasta-pago" v-model="hasta" required inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" placeholder="Ej. 00025" :disabled="bloqueado" /></div>
       </div>
       <div class="form-row">
         <div class="field"><label for="medio-pago">Medio de pago</label><select id="medio-pago" v-model="medio" :disabled="bloqueado"><option v-for="opcion in MEDIOS_PAGO" :key="opcion">{{ opcion }}</option></select></div>
       </div>
       <div class="field"><label for="responsable-pago">Responsable del pago *</label><input id="responsable-pago" v-model="responsable" required maxlength="120" placeholder="Nombre y apellido de la persona responsable" :disabled="bloqueado" /></div>
       <p v-if="editando !== null" class="helper">Puedes corregir la cartilla, el medio y el responsable. Si cambias el número, la cartilla anterior quedará pendiente.</p>
-      <template v-if="editando === null">
-        <p class="helper">Ambos números están incluidos. El responsable y el medio de pago se aplican a todo el rango. Para una sola cartilla, repite el número en ambos campos.</p>
+      <template v-if="esBloque">
+        <p class="helper">Se pagarán todas las cartillas consecutivas desde el primer número hasta el último, ambos incluidos. El responsable y el medio de pago se aplican a todo el bloque.</p>
         <p v-if="errorRango" class="notice error" role="alert">{{ errorRango }}</p>
         <p v-if="rango.length && pagos.listo" class="helper" role="status">{{ rango.length }} cartillas seleccionadas · {{ rango.length - pagadasEnRango }} pendientes · {{ pagadasEnRango }} pagadas.</p>
         <p v-if="pagadasEnRango && pagos.listo" class="notice error" role="alert">El rango contiene cartillas pagadas. Ajusta los números para registrar únicamente cartillas pendientes.</p>
       </template>
-      <p v-if="editando !== null && seleccionada && pagos.listo" class="helper">
+      <p v-if="!esBloque && seleccionada && pagos.listo" class="helper">
         #{{ seleccionada.codigo }} · {{ seleccionada.grupo }} ·
         <span class="status" :class="seleccionada.pago ? 'green' : 'amber'">{{ seleccionada.estado }}</span>
       </p>
       <button class="primary-btn" type="submit" :disabled="bloqueado || !puedeGuardar || !responsable.trim()">
-        {{ guardando ? 'Guardando…' : editando !== null ? 'Guardar cambios' : 'Registrar pago del rango' }}
+        {{ guardando ? 'Guardando…' : editando !== null ? 'Guardar cambios' : esBloque ? 'Registrar pago del bloque' : 'Registrar pago de la cartilla' }}
       </button>
       <button v-if="editando !== null" class="outline-btn" type="button" :disabled="guardando" @click="cancelarEdicion">Cancelar edición</button>
       <p class="helper payment-help">Registra el pago después de confirmar que lo recibiste.</p>
