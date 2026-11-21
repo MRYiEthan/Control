@@ -8,7 +8,7 @@ const enlace = ref('')
 const mensaje = ref('')
 const cargando = ref(false)
 
-const claveVenta = ref('')
+const ventaAbierta = ref(false)
 const estadoConocido = ref(false)
 const gestionando = ref(false)
 const errorVenta = ref('')
@@ -17,13 +17,13 @@ async function administrar(accion) {
   gestionando.value = true
   errorVenta.value = ''
   try {
-    const { data, error } = await supabase.rpc('administrar_venta', { p_accion: accion })
+    const { data, error } = await supabase.rpc('gestionar_venta_por_enlace', { p_accion: accion })
     if (error) throw error
-    claveVenta.value = data || ''
+    ventaAbierta.value = data === true
     estadoConocido.value = true
   } catch {
     estadoConocido.value = false
-    claveVenta.value = ''
+    ventaAbierta.value = false
     errorVenta.value = 'No se pudo comprobar el estado de la venta.'
   } finally {
     gestionando.value = false
@@ -57,7 +57,7 @@ async function compartir() {
 <template>
   <section v-if="supabase" class="surface surface-pad compartir">
     <h2>Enlace de visita del bingo</h2>
-    <p>Comparte este enlace para consultar cartillas. Quienes registren ventas usarán el mismo enlace y una clave del equipo.</p>
+    <p>Comparte este enlace para consultar cartillas. Mientras la venta esté abierta, cualquier persona con el enlace podrá registrar pagos después de indicar su nombre.</p>
     <button class="primary-btn" type="button" :disabled="cargando" @click="compartir">
       {{ cargando ? 'Obteniendo enlace…' : 'Copiar enlace de invitado' }}
     </button>
@@ -72,11 +72,8 @@ async function compartir() {
     <button v-if="!estadoConocido" class="outline-btn" :disabled="gestionando" @click="administrar('estado')">
       {{ gestionando ? 'Consultando…' : 'Consultar estado' }}
     </button>
-    <template v-else-if="claveVenta">
-      <p>Venta abierta. Comparte esta clave solo con quienes registrarán pagos.</p>
-      <div class="field"><label for="clave-equipo">Clave del equipo</label>
-        <input id="clave-equipo" readonly :value="claveVenta" @focus="$event.target.select()" />
-      </div>
+    <template v-else-if="ventaAbierta">
+      <p>Venta abierta.</p>
       <button class="outline-btn" :disabled="gestionando" @click="administrar('cerrar')">Cerrar venta</button>
     </template>
     <button v-else class="outline-btn" :disabled="gestionando" @click="administrar('abrir')">Abrir venta en vivo</button>

@@ -8,7 +8,6 @@ import { validarNombreVenta } from '@/domain/pagos/nombreVenta'
 const props = defineProps({ codigo: { type: String, required: true } })
 const emit = defineEmits(['ocupado'])
 const operador = ref('')
-const clave = ref('')
 const turno = ref('')
 const numero = ref('')
 const responsable = ref('')
@@ -20,7 +19,6 @@ const ocupado = ref(false)
 function cambiarPersona() {
   turno.value = ''
   operador.value = ''
-  clave.value = ''
   numero.value = ''
   responsable.value = ''
   medio.value = ''
@@ -36,14 +34,13 @@ async function enviar() {
   try {
     if (!turno.value) {
       const nombre = validarNombreVenta(operador.value)
-      const respuesta = await supabase.rpc('iniciar_venta', {
-        p_codigo: props.codigo, p_clave: clave.value.trim(), p_operador: nombre,
+      const respuesta = await supabase.rpc('iniciar_venta_por_enlace', {
+        p_codigo: props.codigo, p_operador: nombre,
       })
-      if (respuesta.error?.code === '42501') throw new Error('Comprueba la clave con el organizador y que la venta esté abierta.')
+      if (respuesta.error?.code === '42501') throw new Error('La venta está cerrada o el enlace no es válido. Consulta con el organizador.')
       if (respuesta.error || !respuesta.data) throw new Error('No se pudo iniciar el registro. Revisa tu conexión y vuelve a intentarlo.')
       operador.value = nombre
       turno.value = respuesta.data
-      clave.value = ''
       return
     }
 
@@ -82,9 +79,6 @@ async function enviar() {
         <legend>¿Quién está llenando este formulario?</legend>
         <div class="field"><label for="operador-venta">Tu nombre y apellido</label>
           <input id="operador-venta" v-model="operador" maxlength="120" autocomplete="name" required />
-        </div>
-        <div class="field"><label for="clave-venta">Clave del equipo de ventas</label>
-          <input id="clave-venta" v-model="clave" type="password" autocomplete="off" required />
         </div>
         <button class="primary-btn full-width">{{ ocupado ? 'Verificando…' : 'Continuar' }}</button>
       </template>
