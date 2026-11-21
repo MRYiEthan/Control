@@ -7,6 +7,12 @@ import DistribucionView from '@/views/DistribucionView.vue'
 import PagosView from '@/views/PagosView.vue'
 import ConsultaView from '@/views/ConsultaView.vue'
 const router=createRouter({history:createWebHashHistory(),routes:[
+  {
+    path: '/invitado/:codigo?',
+    name: 'invitado',
+    component: () => import('@/views/InvitadoView.vue'),
+    props: true,
+  },
   {path:'/login',name:'login',component:LoginView},
   {path:'/',name:'home',component:HomeView,meta:{requiereAuth:true}},
   {path:'/grupos',name:'grupos',component:GruposView,meta:{requiereAuth:true}},
@@ -16,6 +22,7 @@ const router=createRouter({history:createWebHashHistory(),routes:[
   {path:'/:pathMatch(.*)*',redirect:'/'},
 ]})
 router.beforeEach(async to=>{
+  if (to.name === 'invitado') return true
   const auth=useAuthStore()
   try{await auth.inicializar()}catch(e){console.error('No se pudo verificar la sesión',e);if(to.name!=='login')return {name:'login'};return true}
   if(to.meta.requiereAuth&&!auth.usuario)return {name:'login'}

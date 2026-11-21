@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import EnlaceInvitado from '@/components/EnlaceInvitado.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { useDistribucionStore } from '@/stores/distribucion'
 import { useGruposStore } from '@/stores/grupos'
@@ -80,6 +81,7 @@ watch(
     </div>
     <span class="tag">00001 – 03000</span>
   </div>
+  <EnlaceInvitado />
   <div class="section-grid equal" style="align-items: start">
     <section class="surface surface-pad">
       <div class="surface-heading">

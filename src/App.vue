@@ -3,9 +3,9 @@ import { computed } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 const route = useRoute()
-const isLogin = computed(() => route.name === 'login')
+const mostrarPanel = computed(() => route.meta.requiereAuth === true)
 </script>
 <template>
-  <RouterView v-if="isLogin" />
-  <AppShell v-else><RouterView /></AppShell>
+  <AppShell v-if="mostrarPanel"><RouterView /></AppShell>
+  <RouterView v-else :key="route.fullPath" />
 </template>
