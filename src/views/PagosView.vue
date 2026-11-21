@@ -6,6 +6,7 @@ import { useDistribucionStore } from '@/stores/distribucion'
 import { useGruposStore } from '@/stores/grupos'
 import { supabaseConfigurado } from '@/infrastructure/supabase/supabaseClient'
 import { crearInventario, numerosDelRango, MEDIOS_PAGO } from '@/domain/pagos/pago'
+import { descargarArchivo } from '@/infrastructure/reportes/descargarArchivo'
 
 const pagos = usePagosStore(), distribucion = useDistribucionStore(), grupos = useGruposStore()
 const numero = ref(''), medio = ref('Efectivo'), busqueda = ref(''), estado = ref('')
@@ -13,6 +14,7 @@ const hasta = ref('')
 const tipoPago = ref('unidad')
 const error = ref(''), mensaje = ref(''), cargando = ref(false), guardando = ref(false)
 const responsable = ref(''), editando = ref(null)
+const exportando = ref(false)
 const esBloque = computed(() => editando.value === null && tipoPago.value === 'bloque')
 const pagina = ref(1), porPagina = 50
 const inventario = computed(() => crearInventario(pagos.pagos, distribucion.asignaciones, grupos.grupos))
@@ -39,19 +41,35 @@ const visibles = computed(() => inventario.value.filter(c =>
 ))
 const paginas = computed(() => Math.max(1, Math.ceil(visibles.value.length / porPagina)))
 const filas = computed(() => visibles.value.slice((pagina.value - 1) * porPagina, pagina.value * porPagina))
-const bloqueado = computed(() => cargando.value || guardando.value || !pagos.listo)
+const bloqueado = computed(() => cargando.value || guardando.value || exportando.value || !pagos.listo)
 watch([busqueda, estado], () => { pagina.value = 1 })
 watch(paginas, total => { pagina.value = Math.min(pagina.value, total) })
 watch(tipoPago, () => { hasta.value = ''; error.value = ''; mensaje.value = '' })
 const fecha = value => value ? new Date(value).toLocaleString('es-PE') : '—'
 
 async function cargar() {
-  if (guardando.value) return
+  if (guardando.value || exportando.value) return
   cargando.value = true
   error.value = ''
   try { await Promise.all([pagos.cargar(), distribucion.cargar(), grupos.cargar()]) }
   catch (e) { error.value = e.message }
   finally { cargando.value = false }
+}
+async function descargarExcel() {
+  if (bloqueado.value) return
+  exportando.value = true
+  error.value = ''
+  mensaje.value = ''
+  try {
+    const { crearExcelCartillas } = await import('@/infrastructure/reportes/crearExcelCartillas')
+    await pagos.cargar()
+    if (!pagos.listo) return
+    descargarArchivo('control-de-cartillas.xlsx', crearExcelCartillas(inventario.value))
+  } catch {
+    error.value = 'No se pudo descargar el Excel. Actualiza los pagos y vuelve a intentarlo.'
+  } finally {
+    exportando.value = false
+  }
 }
 async function registrar() {
   if (bloqueado.value) return
@@ -112,7 +130,12 @@ onMounted(cargar)
 <template>
   <div class="page-header">
     <div><h1>Control de pagos</h1><p>Registra pagos por unidad para ventas en la parroquia o en bloque para grupos.</p></div>
-    <button class="outline-btn" :disabled="cargando || guardando" @click="cargar">Actualizar</button>
+    <div class="page-actions">
+      <button type="button" class="outline-btn" :disabled="bloqueado" @click="descargarExcel">
+        <AppIcon name="download" :size="17" /> {{ exportando ? 'Preparando Excel…' : 'Descargar Excel' }}
+      </button>
+      <button class="outline-btn" :disabled="cargando || guardando || exportando" @click="cargar">Actualizar</button>
+    </div>
   </div>
   <div v-if="!supabaseConfigurado" class="notice">
     <AppIcon name="info" :size="19" />
