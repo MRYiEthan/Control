@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import PrecioCartilla from '@/components/PrecioCartilla.vue'
+import { enSoles } from '@/domain/pagos/precioCartilla'
 import AppIcon from '@/components/AppIcon.vue'
 import { usePagosStore } from '@/stores/pagos'
 import { useDistribucionStore } from '@/stores/distribucion'
@@ -148,6 +150,7 @@ onMounted(cargar)
     <div class="surface metric-card"><div class="metric-icon green"><AppIcon name="check" /></div><div><div class="metric-title">Pagadas</div><div class="metric-value">{{ pagos.listo ? pagos.pagos.length : '—' }}</div></div></div>
     <div class="surface metric-card"><div class="metric-icon amber"><AppIcon name="clock" /></div><div><div class="metric-title">Pendientes</div><div class="metric-value">{{ pagos.listo ? 3000 - pagos.pagos.length : '—' }}</div></div></div>
   </div>
+  <PrecioCartilla v-if="supabaseConfigurado" />
   <section class="surface surface-pad">
     <div class="surface-heading"><h2>{{ editando !== null ? 'Editar pago de #' + String(editando).padStart(5, '0') : 'Registrar pago' }}</h2></div>
     <form @submit.prevent="registrar">
@@ -194,11 +197,11 @@ onMounted(cargar)
     <div v-else-if="!pagos.listo" class="empty-state">No se pudo consultar el estado de los pagos. Pulsa Actualizar para reintentar.</div>
     <template v-else>
       <div class="table-scroll"><table class="responsive-table">
-        <thead><tr><th>Cartilla</th><th>Grupo actual</th><th>Estado</th><th>Medio</th><th>Responsable del pago</th><th>Registrado por</th><th>Fecha de registro</th><th>Acción</th></tr></thead>
+        <thead><tr><th>Cartilla</th><th>Grupo actual</th><th>Estado</th><th>Medio</th><th>Responsable del pago</th><th>Precio cobrado</th><th>Registrado por</th><th>Fecha de registro</th><th>Acción</th></tr></thead>
         <tbody><tr v-for="cartilla in filas" :key="cartilla.numero">
           <td data-label="Cartilla"><strong>#{{ cartilla.codigo }}</strong></td><td data-label="Grupo actual">{{ cartilla.grupo }}</td>
           <td data-label="Estado"><span class="status" :class="cartilla.pago ? 'green' : 'amber'">{{ cartilla.estado }}</span></td>
-          <td data-label="Medio">{{ cartilla.pago?.medio || '—' }}</td><td data-label="Responsable del pago">{{ cartilla.pago ? (cartilla.pago.responsable || 'Sin registrar') : '—' }}</td><td data-label="Registrado por">{{ cartilla.pago?.registrado_por || '—' }}</td><td data-label="Fecha de registro">{{ fecha(cartilla.pago?.created_at) }}</td>
+          <td data-label="Medio">{{ cartilla.pago?.medio || '—' }}</td><td data-label="Responsable del pago">{{ cartilla.pago ? (cartilla.pago.responsable || 'Sin registrar') : '—' }}</td><td data-label="Precio cobrado">{{ cartilla.pago?.precio_centimos != null ? enSoles(cartilla.pago.precio_centimos) : '—' }}</td><td data-label="Registrado por">{{ cartilla.pago?.registrado_por || '—' }}</td><td data-label="Fecha de registro">{{ fecha(cartilla.pago?.created_at) }}</td>
           <td data-label="Acción"><button v-if="!cartilla.pago" class="outline-btn button-sm" :disabled="bloqueado" @click="seleccionar(cartilla)">Registrar pago</button><div v-else class="table-actions"><button class="outline-btn button-sm" :disabled="bloqueado" @click="editar(cartilla)">Editar</button><button class="danger-btn button-sm" :disabled="bloqueado" @click="devolverPendiente(cartilla)">Devolver a pendiente</button></div></td>
         </tr></tbody>
       </table></div>
