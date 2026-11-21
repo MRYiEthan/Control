@@ -1,5 +1,5 @@
 const KEY = 'control-bingo:pagos:v1'
-const COLUMNAS = 'numero,medio,responsable,created_at'
+const COLUMNAS = 'numero,medio,responsable,registrado_por,created_at'
 const TAMANO_PAGINA = 500
 
 export function crearPagosRepository({ cliente = null, storage }) {

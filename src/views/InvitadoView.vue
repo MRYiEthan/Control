@@ -1,11 +1,14 @@
 <script setup>
 import { computed, ref } from 'vue'
+import VentaEnVivo from '@/components/VentaEnVivo.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { crearNumeroCarton } from '@/domain/cartones/numeroCarton'
 import { supabase } from '@/infrastructure/supabase/supabaseClient'
 
 const props = defineProps({ codigo: { type: String, default: '' } })
 const enlaceValido = computed(() => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(props.codigo))
+const modo = ref('consulta')
+const ventaOcupada = ref(false)
 const numero = ref('')
 const resultado = ref(null)
 const error = ref('')
@@ -47,10 +50,16 @@ async function consultar() {
   <main class="invitado">
     <section class="surface surface-pad consulta">
       <div class="surface-heading"><AppIcon name="ticket" /><span>Control de Bingo</span></div>
-      <h1>Verificar pago de cartilla</h1>
+      <h1>Cartillas del bingo</h1>
       <p v-if="!enlaceValido" class="notice" role="alert">Abre el enlace de invitado que te compartió el organizador.</p>
       <p v-else-if="!supabase" class="notice" role="alert">La consulta de invitados no está disponible en esta demostración.</p>
       <template v-else>
+        <div class="segmented opciones" role="group" aria-label="Acción sobre la cartilla">
+          <button type="button" :disabled="cargando || ventaOcupada" :aria-pressed="modo === 'consulta'" :class="{active: modo === 'consulta'}" @click="modo = 'consulta'">Consultar cartón</button>
+          <button type="button" :disabled="cargando || ventaOcupada" :aria-pressed="modo === 'venta'" :class="{active: modo === 'venta'}" @click="modo = 'venta'; resultado = null; error = ''">Pagar cartón</button>
+        </div>
+        <VentaEnVivo v-if="modo === 'venta'" :codigo="props.codigo" @ocupado="ventaOcupada = $event" />
+        <template v-else>
         <form @submit.prevent="consultar">
           <div class="field">
             <label for="cartilla">Número de cartilla</label>
@@ -71,6 +80,7 @@ async function consultar() {
             </span>
           </div>
         </div>
+        </template>
       </template>
     </section>
   </main>
@@ -79,5 +89,6 @@ async function consultar() {
 .invitado { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
 .consulta { width: 100%; max-width: 28rem; }
 .consulta h1 { font-size: clamp(1.55rem, 5vw, 2rem); }
+.opciones { margin-top: 1rem; }
 .consulta form, .consulta .result-line { margin-top: 1.5rem; }
 </style>

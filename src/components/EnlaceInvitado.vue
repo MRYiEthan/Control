@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/infrastructure/supabase/supabaseClient'
 
@@ -7,6 +7,29 @@ const router = useRouter()
 const enlace = ref('')
 const mensaje = ref('')
 const cargando = ref(false)
+
+const claveVenta = ref('')
+const estadoConocido = ref(false)
+const gestionando = ref(false)
+const errorVenta = ref('')
+
+async function administrar(accion) {
+  gestionando.value = true
+  errorVenta.value = ''
+  try {
+    const { data, error } = await supabase.rpc('administrar_venta', { p_accion: accion })
+    if (error) throw error
+    claveVenta.value = data || ''
+    estadoConocido.value = true
+  } catch {
+    estadoConocido.value = false
+    claveVenta.value = ''
+    errorVenta.value = 'No se pudo comprobar el estado de la venta.'
+  } finally {
+    gestionando.value = false
+  }
+}
+onMounted(() => { if (supabase) administrar('estado') })
 
 async function compartir() {
   cargando.value = true
@@ -33,8 +56,8 @@ async function compartir() {
 </script>
 <template>
   <section v-if="supabase" class="surface surface-pad compartir">
-    <h2>Consulta para invitados</h2>
-    <p>Comparte este enlace para que puedan verificar el pago de una cartilla sin iniciar sesión.</p>
+    <h2>Enlace de visita del bingo</h2>
+    <p>Comparte este enlace para consultar cartillas. Quienes registren ventas usarán el mismo enlace y una clave del equipo.</p>
     <button class="primary-btn" type="button" :disabled="cargando" @click="compartir">
       {{ cargando ? 'Obteniendo enlace…' : 'Copiar enlace de invitado' }}
     </button>
@@ -43,6 +66,20 @@ async function compartir() {
       <input id="enlace-invitado" :value="enlace" readonly @focus="$event.target.select()" />
     </div>
     <p role="status">{{ mensaje }}</p>
+    <hr />
+    <h3>Venta en vivo</h3>
+    <p v-if="errorVenta" role="alert">{{ errorVenta }}</p>
+    <button v-if="!estadoConocido" class="outline-btn" :disabled="gestionando" @click="administrar('estado')">
+      {{ gestionando ? 'Consultando…' : 'Consultar estado' }}
+    </button>
+    <template v-else-if="claveVenta">
+      <p>Venta abierta. Comparte esta clave solo con quienes registrarán pagos.</p>
+      <div class="field"><label for="clave-equipo">Clave del equipo</label>
+        <input id="clave-equipo" readonly :value="claveVenta" @focus="$event.target.select()" />
+      </div>
+      <button class="outline-btn" :disabled="gestionando" @click="administrar('cerrar')">Cerrar venta</button>
+    </template>
+    <button v-else class="outline-btn" :disabled="gestionando" @click="administrar('abrir')">Abrir venta en vivo</button>
   </section>
 </template>
 <style scoped>
