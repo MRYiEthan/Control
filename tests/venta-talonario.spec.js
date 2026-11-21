@@ -27,7 +27,7 @@ it('vende del talonario físico y exige confirmar otra vez si cambia el precio',
   await pantalla.get('#cantidad-venta').setValue('3')
   expect(pantalla.text()).toContain('00121–00123')
   expect(pantalla.text()).toMatch(/30[.,]00/)
-  await pantalla.get('#responsable-venta').setValue('José Vera')
+  expect(pantalla.find('#responsable-venta').exists()).toBe(false)
   await pantalla.get('#medio-venta').setValue('Yape')
   precio = 750
   await enviar()
@@ -35,6 +35,7 @@ it('vende del talonario físico y exige confirmar otra vez si cambia el precio',
   expect(pantalla.text()).toMatch(/22[.,]50/)
   await enviar()
   expect(pantalla.get('[role="status"]').text()).toContain('00121–00123')
+  expect(rpc).toHaveBeenCalledWith('vender_cartillas', expect.objectContaining({ p_responsable: 'Ana Ruiz' }))
   expect(pantalla.text()).toContain('00124–00150')
   expect(sessionStorage.getItem('bingo:venta-pendiente:enlace')).toBeNull()
   pantalla.unmount()

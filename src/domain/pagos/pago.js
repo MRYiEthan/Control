@@ -41,7 +41,8 @@ export function crearInventario(pagos, asignaciones = [], grupos = []) {
     const pago = porNumero.get(numero)
     return {
       numero, codigo: crearNumeroCarton(numero),
-      grupo: porGrupo.get(asignacion?.grupoId)?.nombre || 'Sin asignar',
+      asignada: Boolean(asignacion),
+      grupo: asignacion ? (porGrupo.get(asignacion.grupoId)?.nombre || 'Grupo no disponible') : 'Sin asignar',
       estado: pago ? 'Pagada' : 'Pendiente', pago,
     }
   })

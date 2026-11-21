@@ -4,7 +4,7 @@ const hoja = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
 const relaciones = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const paquete = 'http://schemas.openxmlformats.org/package/2006/relationships'
 const tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml'
-const columnas = ['Número de cartilla', 'Responsable del pago', 'Estado de pago']
+const columnas = ['Número de cartilla', 'Grupo', 'Estado de pago']
 
 // Las cadenas en línea conservan los ceros iniciales y los nombres que empiezan con "=".
 function texto(valor) {
@@ -28,9 +28,11 @@ function relacion(destino, clase) {
 }
 
 export function crearExcelCartillas(inventario) {
-  const rango = `A1:C${inventario.length + 1}`
-  const filas = inventario.map(({ codigo, pago, estado }, i) =>
-    fila(i + 2, [codigo, pago ? (pago.responsable || 'Sin registrar') : '', estado]))
+  const asignadas = inventario.filter(cartilla => cartilla.asignada)
+  if (!asignadas.length) return null
+  const rango = `A1:C${asignadas.length + 1}`
+  const filas = asignadas.map(({ codigo, grupo, estado }, i) =>
+    fila(i + 2, [codigo, grupo, estado]))
   const archivos = {
     '[Content_Types].xml': `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
       <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>

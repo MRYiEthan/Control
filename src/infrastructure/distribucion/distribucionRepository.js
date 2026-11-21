@@ -1,3 +1,4 @@
+import { listarPorPaginas } from '@/infrastructure/supabase/listarPorPaginas'
 import { supabase } from '@/infrastructure/supabase/supabaseClient'
 const KEY='control-bingo:asignaciones-demo:v1'
 function leer(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return []}}
@@ -6,9 +7,13 @@ function normalizar(row){return { id:row.id, grupoId:row.grupo_id ?? row.grupoId
 export const distribucionRepository={
   async listar(){
     if(!supabase)return leer()
-    const {data,error}=await supabase.from('asignaciones_demo').select('id,grupo_id,inicio,fin,created_at').order('inicio')
-    if(error)throw new Error('No se pudo obtener la distribución. Revisa el archivo supabase/schema.sql. '+error.message)
-    return (data||[]).map(normalizar)
+    try {
+      const filas = await listarPorPaginas(() => supabase.from('asignaciones_demo')
+        .select('id,grupo_id,inicio,fin,created_at').order('inicio').order('id'))
+      return filas.map(normalizar)
+    } catch (error) {
+      throw new Error('No se pudo obtener la distribución. ' + error.message)
+    }
   },
   async crear(asignacion){
     if(!supabase){escribir([...leer(),asignacion]);return}

@@ -1,3 +1,4 @@
+import { listarPorPaginas } from '@/infrastructure/supabase/listarPorPaginas'
 import { supabase } from '@/infrastructure/supabase/supabaseClient'
 
 const KEY = 'control-bingo:grupos-demo:v1'
@@ -13,9 +14,8 @@ function escribir(items) { localStorage.setItem(KEY,JSON.stringify(items)) }
 export const gruposRepository = {
   async listar() {
     if (!supabase) return [...leer()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
-    const {data,error}=await supabase.from('grupos_demo').select('id,nombre,responsable,area').order('nombre')
-    if(error) throw error
-    return data || []
+    return listarPorPaginas(() => supabase.from('grupos_demo')
+      .select('id,nombre,responsable,area').order('nombre').order('id'))
   },
   async crear(grupo) {
     if (!supabase) { escribir([...leer(),grupo]); return }

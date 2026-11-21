@@ -64,9 +64,14 @@ async function descargarExcel() {
   mensaje.value = ''
   try {
     const { crearExcelCartillas } = await import('@/infrastructure/reportes/crearExcelCartillas')
-    await pagos.cargar()
+    await Promise.all([pagos.cargar(), distribucion.cargar(), grupos.cargar()])
     if (!pagos.listo) return
-    descargarArchivo('control-de-cartillas.xlsx', crearExcelCartillas(inventario.value))
+    const excel = crearExcelCartillas(inventario.value)
+    if (!excel) {
+      mensaje.value = 'Todavía no hay cartillas asignadas para exportar.'
+      return
+    }
+    descargarArchivo('control-de-cartillas.xlsx', excel)
   } catch {
     error.value = 'No se pudo descargar el Excel. Actualiza los pagos y vuelve a intentarlo.'
   } finally {

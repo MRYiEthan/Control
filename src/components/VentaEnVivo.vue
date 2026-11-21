@@ -18,7 +18,6 @@ const ultimo = ref(null)
 const editandoTalonario = ref(true)
 const limite = computed(() => siguiente.value === null ? 0 : ultimo.value - siguiente.value + 1)
 const precio = ref(null)
-const responsable = ref('')
 const medio = ref('')
 const error = ref('')
 const recibo = ref(null)
@@ -45,7 +44,6 @@ function cambiarPersona() {
   operador.value = ''
   precio.value = null
   cantidad.value = '1'
-  responsable.value = ''
   medio.value = ''
   recibo.value = null
   error.value = ''
@@ -83,7 +81,6 @@ onMounted(() => {
       cantidad.value = String(s.p_cantidad)
       precio.value = s.p_precio
       medio.value = s.p_medio
-      responsable.value = s.p_responsable
       error.value = 'Hay una venta pendiente de confirmar. Pulsa Reintentar para recuperar el resultado.'
     }
   } catch { /* Sin una solicitud anterior. */ }
@@ -128,9 +125,8 @@ async function vender() {
     if (!cantidadValida.value || precio.value === null) throw new Error('Revisa la cantidad y el precio.')
     if (cantidadValida.value > limite.value) throw new Error('La cantidad supera las cartillas restantes del talonario.')
     if (!MEDIOS_PAGO.includes(medio.value)) throw new Error('Selecciona el medio de pago recibido.')
-    const nombre = validarNombreVenta(responsable.value)
     recordar({ p_codigo: props.codigo, p_turno: turno.value, p_solicitud: crypto.randomUUID(),
-      p_desde: siguiente.value, p_cantidad: cantidadValida.value, p_precio: precio.value, p_medio: medio.value, p_responsable: nombre })
+      p_desde: siguiente.value, p_cantidad: cantidadValida.value, p_precio: precio.value, p_medio: medio.value, p_responsable: operador.value })
   }
   const { data, error: fallo } = await supabase.rpc('vender_cartillas', pendiente.value)
   if (fallo?.code === '42501') {
@@ -165,7 +161,6 @@ async function vender() {
   if (siguiente.value === null) cambiarTalonario()
   recordar(null)
   cantidad.value = '1'
-  responsable.value = ''
   medio.value = ''
   await cargarPrecio()
 }
@@ -224,9 +219,6 @@ async function enviar() {
         <div class="result-line"><span>Precio por cartilla</span><strong>{{ precio !== null ? enSoles(precio) : 'Por consultar' }}</strong></div>
         <button v-if="precio === null" class="outline-btn" type="button" @click="cargarPrecio">Consultar precio</button>
         <div class="result-line" aria-live="polite"><span>Total a cobrar</span><strong>{{ total !== null ? enSoles(total) : '—' }}</strong></div>
-        <div class="field"><label for="responsable-venta">Responsable del pago</label>
-          <input id="responsable-venta" v-model="responsable" maxlength="120" :readonly="!!pendiente" required />
-        </div>
         <div class="field"><label for="medio-venta">Medio de pago</label>
           <select id="medio-venta" v-model="medio" :disabled="!!pendiente" required>
             <option value="" disabled>Selecciona el medio</option>
